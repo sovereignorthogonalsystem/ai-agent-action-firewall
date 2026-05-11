@@ -60,7 +60,11 @@ class AgentActionFirewall:
         self.pass_threshold = pass_threshold
         self.review_threshold = review_threshold
 
-    def evaluate(self, conditions: List[FirewallCondition], metadata: Dict[str, Any]) -> FirewallResult:
+    def evaluate(
+        self,
+        conditions: List[FirewallCondition],
+        metadata: Dict[str, Any],
+    ) -> FirewallResult:
         if not conditions:
             return FirewallResult(
                 decision="REVIEW",
@@ -207,7 +211,9 @@ def verify_action(payload: Dict[str, Any]) -> FirewallResult:
             "estimated_cost_usd": estimated_cost_usd,
         },
     )
-  def verify_tool_call(payload: Dict[str, Any]) -> FirewallResult:
+
+
+def verify_tool_call(payload: Dict[str, Any]) -> FirewallResult:
     policy = get_policy_profile(payload.get("policy_profile"))
 
     tool_name = str(payload.get("tool_name", "unknown"))
@@ -327,4 +333,4 @@ def verify_action(payload: Dict[str, Any]) -> FirewallResult:
             "tool_is_financial": tool_is_financial,
             "tool_is_destructive": tool_is_destructive,
         },
-    )  
+    )
