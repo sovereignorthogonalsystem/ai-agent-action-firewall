@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import os
 from dataclasses import asdict
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from uuid import uuid4
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from firewall import POLICY_PROFILES, verify_action
@@ -15,6 +16,17 @@ app = FastAPI(
     description="Policy and audit middleware for autonomous AI agent actions.",
     version="0.1.0",
 )
+
+
+def require_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
+    expected_key = os.getenv("AI_AGENT_FIREWALL_API_KEY")
+
+    # If unset, allow local development.
+    if not expected_key:
+        return
+
+    if x_api_key != expected_key:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key.")
 
 
 class ActionVerificationRequest(BaseModel):
@@ -71,7 +83,12 @@ def policies() -> Dict[str, Any]:
 
 
 @app.post("/verify/action")
-def verify_action_endpoint(payload: ActionVerificationRequest) -> Dict[str, Any]:
+def verify_action_endpoint(
+    payload: ActionVerificationRequest,
+    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+) -> Dict[str, Any]:
+    require_api_key(x_api_key)
+
     result = verify_action(payload.model_dump())
     response = attach_request_id(asdict(result), "/verify/action")
     return response

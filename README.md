@@ -46,3 +46,15 @@ pytest
 ## Status
 
 Experimental portfolio project. Not legal, security, financial, or professional advice.
+
+## API Key Authentication
+
+For hosted deployments, set:
+
+AI_AGENT_FIREWALL_API_KEY=your-secret-key
+
+Then call protected endpoints with:
+
+X-API-Key: your-secret-key
+
+If AI_AGENT_FIREWALL_API_KEY is unset, the API allows local development without a key.
