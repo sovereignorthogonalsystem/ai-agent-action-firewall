@@ -1,0 +1,12 @@
+{
+  "agent_id": "research-agent-002",
+  "policy_profile": "balanced",
+  "action_type": "summarize_document",
+  "risk_level": "low",
+  "requires_external_side_effect": false,
+  "has_user_approval": false,
+  "contains_sensitive_data": false,
+  "sensitive_data_redacted": true,
+  "destructive_action": false,
+  "estimated_cost_usd": 0.0
+}

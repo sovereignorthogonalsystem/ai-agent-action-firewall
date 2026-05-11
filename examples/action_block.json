@@ -1,0 +1,12 @@
+{
+  "agent_id": "research-agent-001",
+  "policy_profile": "balanced",
+  "action_type": "send_email",
+  "risk_level": "medium",
+  "requires_external_side_effect": true,
+  "has_user_approval": false,
+  "contains_sensitive_data": true,
+  "sensitive_data_redacted": false,
+  "destructive_action": false,
+  "estimated_cost_usd": 0.0
+}
