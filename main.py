@@ -9,6 +9,7 @@ from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from firewall import POLICY_PROFILES, verify_action
+from usage_meter import get_usage_event_by_request_id, log_usage_event, usage_summary
 
 
 app = FastAPI(
@@ -21,7 +22,6 @@ app = FastAPI(
 def require_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
     expected_key = os.getenv("AI_AGENT_FIREWALL_API_KEY")
 
-    # If unset, allow local development.
     if not expected_key:
         return
 
@@ -66,6 +66,8 @@ def root() -> Dict[str, str]:
         "health": "/health",
         "policies": "/policies",
         "verify_action": "/verify/action",
+        "usage_summary": "/usage/summary",
+        "audit_request_lookup": "/audit/request/{request_id}",
     }
 
 
@@ -91,4 +93,34 @@ def verify_action_endpoint(
 
     result = verify_action(payload.model_dump())
     response = attach_request_id(asdict(result), "/verify/action")
+
+    log_usage_event(
+        "/verify/action",
+        response,
+        api_key_label="configured" if os.getenv("AI_AGENT_FIREWALL_API_KEY") else "local-dev",
+    )
+
     return response
+
+
+@app.get("/usage/summary")
+def usage_summary_endpoint(
+    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+) -> Dict[str, Any]:
+    require_api_key(x_api_key)
+    return usage_summary()
+
+
+@app.get("/audit/request/{request_id}")
+def audit_request_endpoint(
+    request_id: str,
+    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+) -> Dict[str, Any]:
+    require_api_key(x_api_key)
+
+    event = get_usage_event_by_request_id(request_id)
+
+    if event is None:
+        raise HTTPException(status_code=404, detail="Request ID not found.")
+
+    return event

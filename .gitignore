@@ -10,3 +10,5 @@ env/
 .vscode/
 .idea/
 *.sqlite3
+*.sqlite3
+ai_agent_firewall_usage.sqlite3

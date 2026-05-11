@@ -1,0 +1,170 @@
+from __future__ import annotations
+
+import json
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, Optional
+
+
+DB_PATH = Path("ai_agent_firewall_usage.sqlite3")
+
+
+def init_usage_db() -> None:
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS usage_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp_utc TEXT NOT NULL,
+                request_id TEXT,
+                endpoint TEXT NOT NULL,
+                api_key_label TEXT,
+                decision TEXT,
+                safety_score REAL,
+                agent_id TEXT,
+                metadata_json TEXT
+            )
+            """
+        )
+        conn.commit()
+
+
+def log_usage_event(
+    endpoint: str,
+    result: Dict[str, Any],
+    api_key_label: Optional[str] = None,
+) -> None:
+    init_usage_db()
+
+    metadata = result.get("metadata") or {}
+    request_id = result.get("request_id") or metadata.get("request_id")
+    agent_id = metadata.get("agent_id")
+
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            INSERT INTO usage_events (
+                timestamp_utc,
+                request_id,
+                endpoint,
+                api_key_label,
+                decision,
+                safety_score,
+                agent_id,
+                metadata_json
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                datetime.now(timezone.utc).isoformat(),
+                request_id,
+                endpoint,
+                api_key_label,
+                result.get("decision"),
+                result.get("safety_score"),
+                agent_id,
+                json.dumps(metadata, sort_keys=True),
+            ),
+        )
+        conn.commit()
+
+
+def usage_summary() -> Dict[str, Any]:
+    init_usage_db()
+
+    with sqlite3.connect(DB_PATH) as conn:
+        total = conn.execute("SELECT COUNT(*) FROM usage_events").fetchone()[0]
+
+        by_endpoint = conn.execute(
+            """
+            SELECT endpoint, COUNT(*)
+            FROM usage_events
+            GROUP BY endpoint
+            ORDER BY COUNT(*) DESC
+            """
+        ).fetchall()
+
+        by_decision = conn.execute(
+            """
+            SELECT decision, COUNT(*)
+            FROM usage_events
+            GROUP BY decision
+            ORDER BY COUNT(*) DESC
+            """
+        ).fetchall()
+
+        latest = conn.execute(
+            """
+            SELECT timestamp_utc, request_id, endpoint, decision, safety_score, agent_id
+            FROM usage_events
+            ORDER BY id DESC
+            LIMIT 10
+            """
+        ).fetchall()
+
+    return {
+        "total_events": total,
+        "by_endpoint": [
+            {"endpoint": row[0], "count": row[1]} for row in by_endpoint
+        ],
+        "by_decision": [
+            {"decision": row[0], "count": row[1]} for row in by_decision
+        ],
+        "latest": [
+            {
+                "timestamp_utc": row[0],
+                "request_id": row[1],
+                "endpoint": row[2],
+                "decision": row[3],
+                "safety_score": row[4],
+                "agent_id": row[5],
+            }
+            for row in latest
+        ],
+    }
+
+
+def get_usage_event_by_request_id(request_id: str) -> Dict[str, Any] | None:
+    init_usage_db()
+
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute(
+            """
+            SELECT
+                timestamp_utc,
+                request_id,
+                endpoint,
+                api_key_label,
+                decision,
+                safety_score,
+                agent_id,
+                metadata_json
+            FROM usage_events
+            WHERE request_id = ?
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            (request_id,),
+        ).fetchone()
+
+    if row is None:
+        return None
+
+    metadata = {}
+    if row[7]:
+        try:
+            metadata = json.loads(row[7])
+        except json.JSONDecodeError:
+            metadata = {"raw_metadata": row[7]}
+
+    return {
+        "timestamp_utc": row[0],
+        "request_id": row[1],
+        "endpoint": row[2],
+        "api_key_label": row[3],
+        "decision": row[4],
+        "safety_score": row[5],
+        "agent_id": row[6],
+        "metadata": metadata,
+    }
