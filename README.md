@@ -79,3 +79,22 @@ Checks include:
 Example:
 
 curl -X POST "http://127.0.0.1:8100/verify/tool-call" -H "Content-Type: application/json" -d @examples/tool_call_block.json
+
+## Docker
+
+Build and run:
+
+```bash
+docker build -t ai-agent-action-firewall .
+docker run -p 8100:8100 ai-agent-action-firewall
+```
+
+Or with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+## Project Brief
+
+See PROJECT_BRIEF.md for the product overview, problem, solution, endpoints, core checks, policy profiles, and resume signal.

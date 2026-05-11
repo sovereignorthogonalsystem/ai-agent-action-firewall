@@ -1,0 +1,8 @@
+services:
+  ai-agent-action-firewall:
+    build: .
+    container_name: ai-agent-action-firewall
+    ports:
+      - "8100:8100"
+    environment:
+      - AI_AGENT_FIREWALL_API_KEY=
