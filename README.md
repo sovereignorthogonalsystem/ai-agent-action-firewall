@@ -58,3 +58,24 @@ Then call protected endpoints with:
 X-API-Key: your-secret-key
 
 If AI_AGENT_FIREWALL_API_KEY is unset, the API allows local development without a key.
+
+## Tool-Call Verification
+
+The firewall can verify proposed AI-agent tool calls before execution.
+
+Endpoint:
+
+- POST /verify/tool-call
+
+Checks include:
+
+- dangerous tool approval
+- financial tool approval
+- destructive tool approval
+- external side-effect approval
+- sensitive data redaction
+- estimated cost ceiling
+
+Example:
+
+curl -X POST "http://127.0.0.1:8100/verify/tool-call" -H "Content-Type: application/json" -d @examples/tool_call_block.json

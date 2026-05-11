@@ -8,7 +8,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from firewall import POLICY_PROFILES, verify_action
+from firewall import POLICY_PROFILES, verify_action, verify_tool_call
 from usage_meter import get_usage_event_by_request_id, log_usage_event, usage_summary
 
 
@@ -46,6 +46,21 @@ class ActionVerificationRequest(BaseModel):
     estimated_cost_usd: float = 0.0
 
 
+class ToolCallVerificationRequest(BaseModel):
+    agent_id: str = Field(default="demo-agent")
+    policy_profile: str = Field(default="balanced")
+
+    tool_name: str = Field(default="unknown")
+    tool_category: str = Field(default="unknown")
+
+    has_user_approval: bool = False
+    contains_sensitive_data: bool = False
+    sensitive_data_redacted: bool = False
+
+    estimated_cost_usd: float = 0.0
+    external_side_effect: bool = False
+
+
 def attach_request_id(response: Dict[str, Any], endpoint: str) -> Dict[str, Any]:
     request_id = str(uuid4())
     response["request_id"] = request_id
@@ -58,6 +73,10 @@ def attach_request_id(response: Dict[str, Any], endpoint: str) -> Dict[str, Any]
     return response
 
 
+def api_key_label() -> str:
+    return "configured" if os.getenv("AI_AGENT_FIREWALL_API_KEY") else "local-dev"
+
+
 @app.get("/")
 def root() -> Dict[str, str]:
     return {
@@ -66,6 +85,7 @@ def root() -> Dict[str, str]:
         "health": "/health",
         "policies": "/policies",
         "verify_action": "/verify/action",
+        "verify_tool_call": "/verify/tool-call",
         "usage_summary": "/usage/summary",
         "audit_request_lookup": "/audit/request/{request_id}",
     }
@@ -94,11 +114,22 @@ def verify_action_endpoint(
     result = verify_action(payload.model_dump())
     response = attach_request_id(asdict(result), "/verify/action")
 
-    log_usage_event(
-        "/verify/action",
-        response,
-        api_key_label="configured" if os.getenv("AI_AGENT_FIREWALL_API_KEY") else "local-dev",
-    )
+    log_usage_event("/verify/action", response, api_key_label=api_key_label())
+
+    return response
+
+
+@app.post("/verify/tool-call")
+def verify_tool_call_endpoint(
+    payload: ToolCallVerificationRequest,
+    x_api_key: Optional[str] = Header(default=None, alias="X-API-Key"),
+) -> Dict[str, Any]:
+    require_api_key(x_api_key)
+
+    result = verify_tool_call(payload.model_dump())
+    response = attach_request_id(asdict(result), "/verify/tool-call")
+
+    log_usage_event("/verify/tool-call", response, api_key_label=api_key_label())
 
     return response
 

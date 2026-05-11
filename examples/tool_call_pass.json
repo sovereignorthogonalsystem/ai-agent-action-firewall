@@ -1,0 +1,11 @@
+{
+  "agent_id": "tool-agent-002",
+  "policy_profile": "balanced",
+  "tool_name": "summarize_text",
+  "tool_category": "internal",
+  "has_user_approval": false,
+  "contains_sensitive_data": false,
+  "sensitive_data_redacted": true,
+  "estimated_cost_usd": 0.01,
+  "external_side_effect": false
+}

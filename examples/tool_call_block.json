@@ -1,0 +1,11 @@
+{
+  "agent_id": "tool-agent-001",
+  "policy_profile": "balanced",
+  "tool_name": "send_email",
+  "tool_category": "external",
+  "has_user_approval": false,
+  "contains_sensitive_data": true,
+  "sensitive_data_redacted": false,
+  "estimated_cost_usd": 0.0,
+  "external_side_effect": true
+}

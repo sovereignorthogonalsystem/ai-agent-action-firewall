@@ -207,3 +207,124 @@ def verify_action(payload: Dict[str, Any]) -> FirewallResult:
             "estimated_cost_usd": estimated_cost_usd,
         },
     )
+  def verify_tool_call(payload: Dict[str, Any]) -> FirewallResult:
+    policy = get_policy_profile(payload.get("policy_profile"))
+
+    tool_name = str(payload.get("tool_name", "unknown"))
+    tool_category = str(payload.get("tool_category", "unknown")).lower()
+
+    has_user_approval = bool(payload.get("has_user_approval", False))
+    contains_sensitive_data = bool(payload.get("contains_sensitive_data", False))
+    sensitive_data_redacted = bool(payload.get("sensitive_data_redacted", False))
+
+    estimated_cost_usd = float(payload.get("estimated_cost_usd", 0.0))
+    external_side_effect = bool(payload.get("external_side_effect", False))
+
+    dangerous_tools = {
+        "send_email",
+        "delete_file",
+        "transfer_funds",
+        "execute_trade",
+        "submit_transaction",
+        "post_social",
+        "external_api_call",
+    }
+
+    financial_tools = {
+        "transfer_funds",
+        "execute_trade",
+        "submit_transaction",
+        "swap_tokens",
+        "withdraw",
+    }
+
+    destructive_tools = {
+        "delete_file",
+        "drop_database",
+        "revoke_access",
+        "terminate_server",
+    }
+
+    tool_is_dangerous = tool_name in dangerous_tools or tool_category in {
+        "financial",
+        "destructive",
+        "external",
+    }
+
+    tool_is_financial = tool_name in financial_tools or tool_category == "financial"
+    tool_is_destructive = tool_name in destructive_tools or tool_category == "destructive"
+
+    conditions = [
+        FirewallCondition(
+            name="known_tool_name",
+            passed=tool_name != "unknown",
+            detail="Tool name is unknown.",
+            weight=1.0,
+            severity="medium",
+        ),
+        FirewallCondition(
+            name="dangerous_tool_requires_approval",
+            passed=not tool_is_dangerous or has_user_approval,
+            detail=f"Dangerous tool call '{tool_name}' requires user approval.",
+            weight=4.0,
+            severity="critical",
+        ),
+        FirewallCondition(
+            name="financial_tool_requires_approval",
+            passed=not tool_is_financial or has_user_approval,
+            detail=f"Financial tool call '{tool_name}' requires user approval.",
+            weight=5.0,
+            severity="critical",
+        ),
+        FirewallCondition(
+            name="destructive_tool_requires_approval",
+            passed=not tool_is_destructive or has_user_approval,
+            detail=f"Destructive tool call '{tool_name}' requires user approval.",
+            weight=5.0,
+            severity="critical",
+        ),
+        FirewallCondition(
+            name="external_side_effect_approval",
+            passed=not external_side_effect or has_user_approval,
+            detail="External side-effect tool call requires user approval.",
+            weight=4.0,
+            severity="critical",
+        ),
+        FirewallCondition(
+            name="sensitive_data_redaction",
+            passed=not contains_sensitive_data or sensitive_data_redacted,
+            detail="Sensitive data must be redacted before tool execution.",
+            weight=4.0,
+            severity="critical",
+        ),
+        FirewallCondition(
+            name="cost_ceiling",
+            passed=estimated_cost_usd <= policy["max_cost_usd"],
+            detail=(
+                f"Estimated tool cost ${estimated_cost_usd:.2f} exceeds policy limit "
+                f"${policy['max_cost_usd']:.2f}."
+            ),
+            weight=2.0,
+            severity="high",
+        ),
+    ]
+
+    firewall = AgentActionFirewall()
+
+    return firewall.evaluate(
+        conditions,
+        metadata={
+            "agent_id": payload.get("agent_id"),
+            "policy_profile": policy["profile"],
+            "tool_name": tool_name,
+            "tool_category": tool_category,
+            "has_user_approval": has_user_approval,
+            "contains_sensitive_data": contains_sensitive_data,
+            "sensitive_data_redacted": sensitive_data_redacted,
+            "estimated_cost_usd": estimated_cost_usd,
+            "external_side_effect": external_side_effect,
+            "tool_is_dangerous": tool_is_dangerous,
+            "tool_is_financial": tool_is_financial,
+            "tool_is_destructive": tool_is_destructive,
+        },
+    )  
